@@ -182,11 +182,11 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
 
       // Function RotWord()
       {
-        k = tempa[0];
+        const uint8_t u8tmp = tempa[0];
         tempa[0] = tempa[1];
         tempa[1] = tempa[2];
         tempa[2] = tempa[3];
-        tempa[3] = k;
+        tempa[3] = u8tmp;
       }
 
       // SubWord() is a function that takes a four-byte input word and 
@@ -240,7 +240,7 @@ void AES_ctx_set_iv(struct AES_ctx* ctx, const uint8_t* iv)
 
 // This function adds the round key to state.
 // The round key is added to the state by an XOR function.
-static void AddRoundKey(uint8_t round,state_t* state,uint8_t* RoundKey)
+static void AddRoundKey(uint8_t round, state_t* state, const uint8_t* RoundKey)
 {
   uint8_t i,j;
   for (i = 0; i < 4; ++i)
@@ -341,6 +341,7 @@ static uint8_t Multiply(uint8_t x, uint8_t y)
 
 #endif
 
+#if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 // MixColumns function mixes the columns of the state matrix.
 // The method used to multiply may be difficult to understand for the inexperienced.
 // Please use the references to gain more information.
@@ -404,10 +405,10 @@ static void InvShiftRows(state_t* state)
   (*state)[2][3] = (*state)[3][3];
   (*state)[3][3] = temp;
 }
-
+#endif // #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
 // Cipher is the main function that encrypts the PlainText.
-static void Cipher(state_t* state, uint8_t* RoundKey)
+static void Cipher(state_t* state, const uint8_t* RoundKey)
 {
   uint8_t round = 0;
 
@@ -432,7 +433,8 @@ static void Cipher(state_t* state, uint8_t* RoundKey)
   AddRoundKey(Nr, state, RoundKey);
 }
 
-static void InvCipher(state_t* state,uint8_t* RoundKey)
+#if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
+static void InvCipher(state_t* state, const uint8_t* RoundKey)
 {
   uint8_t round = 0;
 
@@ -456,7 +458,7 @@ static void InvCipher(state_t* state,uint8_t* RoundKey)
   InvSubBytes(state);
   AddRoundKey(0, state, RoundKey);
 }
-
+#endif // #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
 /*****************************************************************************/
 /* Public functions:                                                         */
@@ -464,13 +466,13 @@ static void InvCipher(state_t* state,uint8_t* RoundKey)
 #if defined(ECB) && (ECB == 1)
 
 
-void AES_ECB_encrypt(struct AES_ctx *ctx, uint8_t* buf)
+void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf)
 {
   // The next function call encrypts the PlainText with the Key using AES algorithm.
   Cipher((state_t*)buf, ctx->RoundKey);
 }
 
-void AES_ECB_decrypt(struct AES_ctx* ctx, uint8_t* buf)
+void AES_ECB_decrypt(const struct AES_ctx* ctx, uint8_t* buf)
 {
   // The next function call decrypts the PlainText with the Key using AES algorithm.
   InvCipher((state_t*)buf, ctx->RoundKey);
@@ -486,7 +488,7 @@ void AES_ECB_decrypt(struct AES_ctx* ctx, uint8_t* buf)
 #if defined(CBC) && (CBC == 1)
 
 
-static void XorWithIv(uint8_t* buf, uint8_t* Iv)
+static void XorWithIv(uint8_t* buf, const uint8_t* Iv)
 {
   uint8_t i;
   for (i = 0; i < AES_BLOCKLEN; ++i) // The block in AES is always 128bit no matter the key size
@@ -495,7 +497,7 @@ static void XorWithIv(uint8_t* buf, uint8_t* Iv)
   }
 }
 
-void AES_CBC_encrypt_buffer(struct AES_ctx *ctx,uint8_t* buf, uint32_t length)
+void AES_CBC_encrypt_buffer(struct AES_ctx *ctx, uint8_t* buf, uint32_t length)
 {
   uintptr_t i;
   uint8_t *Iv = ctx->Iv;
@@ -550,7 +552,7 @@ void AES_CTR_xcrypt_buffer(struct AES_ctx* ctx, uint8_t* buf, uint32_t length)
       /* Increment Iv and handle overflow */
       for (bi = (AES_BLOCKLEN - 1); bi >= 0; --bi)
       {
-	/* inc will owerflow */
+	/* inc will overflow */
         if (ctx->Iv[bi] == 255)
 	{
           ctx->Iv[bi] = 0;
